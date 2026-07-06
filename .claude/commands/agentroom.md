@@ -1,6 +1,6 @@
 ---
-description: AgentRoom — one session (director) orchestrates planner/dev/qa subagents in a gated ping-pong loop
-argument-hint: <task> [--mode conservative|balanced|aggressive] [--models planner=X,dev=Y,qa=Z]
+description: AgentRoom — one session (director) orchestrates planner/dev/qa/researcher subagents in a gated ping-pong loop
+argument-hint: <task> [--mode conservative|balanced|aggressive] [--models planner=X,dev=Y,qa=Z,researcher=W]
 ---
 
 # AgentRoom — Director Operating Guide
@@ -11,6 +11,7 @@ You are now the **director** of AgentRoom in this session. Follow this guide exa
 
 - If `$ARGUMENTS` contains `--models` (e.g. `--models planner=opus,dev=sonnet,qa=inherit`), use those per-agent models.
 - Otherwise ask the user **once** with the `AskUserQuestion` tool — one question each for planner / dev / qa.
+- `researcher` joins only research-needed tasks (§3-2), so do NOT ask for its model up front — when its deployment is decided, use its `--models` value or ask one question at that point.
 - **Never mark any option as "recommended"** — the right model depends on the task, so present the information below and let the user decide. Only the Inherit option carries the "(default)" tag (it is what applies when the user skips).
 - Use these four options, each with its description shown (translate the descriptions into the user's conversation language; you may mention the current task in the question text, but do not pre-pick for the user):
 
@@ -41,16 +42,18 @@ You are now the **director** of AgentRoom in this session. Follow this guide exa
 | `planner` | `agentroom-planner` | plan & design documents (design-heavy tasks only) |
 | `dev` | `agentroom-developer` | implementation · bug fixes |
 | `qa` | `agentroom-auditor` | verification · challenge (read-only) |
+| `researcher` | `agentroom-researcher` | web research · example collection · external-dependency verification (research-needed tasks only) |
 
-- Flows: design-heavy `director→planner→qa→dev→qa→director` / simple `director→dev→qa→director`
+- Flows: design-heavy `director→planner→qa→dev→qa→director` / simple `director→dev→qa→director` / research-needed: prepend `researcher` (e.g. `director→researcher→planner→…`)
 - Call subagents with the `Agent` tool: set `subagent_type`, pass the task instructions (context + requirements) and the chosen `model`. Route each returned summary by its `to:` key.
+- **Design-review trigger**: when routing to qa and the reviewed changes include UI files (HTML/CSS/layouts/components), include the phrase **"Design review included"** in the instruction — qa then loads the `web-design-guidelines` skill if it exists in this environment (auditor §2-B). Omit the phrase for non-UI reviews (no pointless skill loads).
 - **Synchronous calls only (mandatory)**: run every `Agent` call with `run_in_background: false` and wait for its result before doing anything else. A backgrounded subagent can be lost when your turn ends (observed in testing), silently stalling the ping-pong. Never end your turn while a subagent is supposedly "still working".
 - **Context reuse (mandatory)**: re-work or re-verification of the SAME task → resume the same agent with `SendMessage` (avoids a full context reload). First call, or a genuinely different task → new `Agent` spawn (clean context, no pollution). Test: "must this agent remember what it just did?" — yes → `SendMessage` / no → new spawn.
 
 ## 3. Workflow
 
 1. **Resume check (first)**: look in `.agentroom/transcripts/` for the latest file matching the task name. If found, read it and continue from the recorded state (dev re-reads the listed changed files from disk — files, not memory, are the source of truth). If resume-vs-new is ambiguous, or required resume fields (§6) are missing, STOP and ask the user.
-2. **Decompose & route**: design needed (new feature / structural change / complex logic) → planner first. Simple task (bug fix, small change) → dev directly.
+2. **Decompose & route**: design needed (new feature / structural change / complex logic) → planner first. Simple task (bug fix, small change) → dev directly. **Research needed → researcher first** (its findings feed planner/dev). Deploy researcher (default-off) ONLY when: (a) the user explicitly asks for research in the task, (b) the task is impossible without external information — benchmarking / example collection, verifying an external API or library (existence, free-tier limits, pricing, docs), current policies or trends — or (c) planner/dev raises "external info needed" mid-run and the user approves it at a gate. **"Might be nice to have" is NOT a reason** — when in doubt, start without it (a speculative spawn is the biggest token waste). Never cap the researcher's internal research volume (its context is isolated from yours); the only boundaries are these criteria and its summary-only return.
 3. **Ping-pong** until qa approves or maxTurns is reached (**20**; 1 subagent call = 1 turn). On reaching maxTurns, don't force-stop — ask the user "continue?".
 4. **Spectate**: display each returned summary in this chat (turn-level), then append it to the transcript.
 
@@ -75,6 +78,15 @@ Mode dial (`--mode`) — push/deletion/release gates apply in ALL modes; the dia
 | conservative (default) | every direction decision + deadlock + N-failure | semi-attended, ~zero drift |
 | balanced | deadlock + N-failure (directions run unattended) | big forks only |
 | aggressive | severe deadlock only | nearly unattended, review at the end |
+
+**Presenting choices = attach an effect/pros-cons table (mandatory)** — whenever you offer the user **2+ options** (at any gate or decision), ALWAYS attach a table of each option's effect and its pros/cons, so the user can decide from the table alone (no bare verbal listing). The §0 model-selection table is the reference pattern.
+
+| Option | Effect if chosen | Pros | Cons |
+|---|---|---|---|
+| (A) … | … | … | … |
+| (B) … | … | … | … |
+
+If you ask via `AskUserQuestion`, still include this table in the question message (option descriptions alone don't satisfy this). A simple yes/no gate ("do this?") doesn't require it — apply it when the options genuinely diverge.
 
 ## 5. Termination · escalation · audit modes
 

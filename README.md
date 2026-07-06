@@ -13,8 +13,9 @@ One session becomes the **director** and ping-pongs **planner → dev → qa** s
 ```
 
 ```
-[design-heavy]  planner (design) → qa (design review) → dev (implement) → qa (review) → APPROVED → done
-[simple task]   dev (implement) → qa (review & challenge) → dev (fix) → qa (re-verify) → APPROVED → done
+[design-heavy]   planner (design) → qa (design review) → dev (implement) → qa (review) → APPROVED → done
+[simple task]    dev (implement) → qa (review & challenge) → dev (fix) → qa (re-verify) → APPROVED → done
+[research-first] researcher (web research) → prepended to either flow (joins only when the task truly needs external info)
 ```
 
 ## Why AgentRoom (vs. fully-automated orchestrators)
@@ -35,7 +36,8 @@ One session becomes the **director** and ping-pongs **planner → dev → qa** s
        └── agents/
            ├── agentroom-planner.md
            ├── agentroom-developer.md
-           └── agentroom-auditor.md
+           ├── agentroom-auditor.md
+           └── agentroom-researcher.md
    ```
 2. **Restart your Claude Code session** (agent files are registered at session start).
 3. Run:
@@ -45,7 +47,7 @@ One session becomes the **director** and ping-pongs **planner → dev → qa** s
 
 ## Model selection (asked at start)
 
-On every run, the director first asks which model each agent should use — **planner / dev / qa**. No option is marked "recommended": the right choice depends on your task, so each option is shown with its use cases and trade-offs:
+On every run, the director first asks which model each agent should use — **planner / dev / qa**. (**researcher** joins only research-needed tasks; its model is asked if and when it joins, or set via `--models researcher=...`.) No option is marked "recommended": the right choice depends on your task, so each option is shown with its use cases and trade-offs:
 
 | Model | Best for | Trade-off |
 |---|---|---|
@@ -60,7 +62,7 @@ On every run, the director first asks which model each agent should use — **pl
 Skip the questions with a flag:
 
 ```
-/agentroom --models planner=opus,dev=sonnet,qa=opus <task>
+/agentroom --models planner=opus,dev=sonnet,qa=opus,researcher=sonnet <task>
 ```
 
 ## Roles
@@ -71,6 +73,9 @@ Skip the questions with a flag:
 | `planner` | `agentroom-planner` | plan & design documents | Read/Grep/Glob/Write/Edit |
 | `dev` | `agentroom-developer` | implementation · bug fixes | + Bash |
 | `qa` | `agentroom-auditor` | verification · challenge · verdicts | **read-only** |
+| `researcher` | `agentroom-researcher` | web research · examples · external-dependency verification (research-needed tasks only) | Read/Grep/Glob/Write + WebSearch/WebFetch |
+
+**Conditional design skills** — for UI changes the director marks the review instruction with **"Design review included"**: qa then loads the `web-design-guidelines` skill (objective checks only: contrast, spacing, hierarchy, responsiveness), and dev loads `artifact-design` before building visual deliverables. Both load **only if those skills exist in your environment**; otherwise the agents note it and proceed with baseline criteria. Non-UI runs never load them.
 
 ## Gate modes
 

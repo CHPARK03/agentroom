@@ -13,8 +13,9 @@
 ```
 
 ```
-[설계 필요]  planner(설계) → qa(설계검수) → dev(구현) → qa(검수) → APPROVED → 종료
-[단순 작업]  dev(구현) → qa(검수·반박) → dev(수정) → qa(재검증) → APPROVED → 종료
+[설계 필요]   planner(설계) → qa(설계검수) → dev(구현) → qa(검수) → APPROVED → 종료
+[단순 작업]   dev(구현) → qa(검수·반박) → dev(수정) → qa(재검증) → APPROVED → 종료
+[리서치 필요] researcher(웹 조사) → 위 흐름 맨 앞에 연결 (외부 정보가 꼭 필요한 작업에서만 투입)
 ```
 
 ## 왜 AgentRoom인가 (완전 자동 오케스트레이터와의 차이)
@@ -35,7 +36,8 @@
        └── agents/
            ├── agentroom-planner.md
            ├── agentroom-developer.md
-           └── agentroom-auditor.md
+           ├── agentroom-auditor.md
+           └── agentroom-researcher.md
    ```
 2. **Claude Code 세션 재시작** (에이전트 파일은 세션 시작 시 등록됨).
 3. 실행:
@@ -45,7 +47,7 @@
 
 ## 모델 선택 (시작 시 질문)
 
-실행하면 director가 먼저 에이전트별 모델을 묻는다 — **planner / dev / qa** 각각. "권장" 표기는 없다: 작업에 따라 맞는 모델이 다르므로, 각 옵션에 용도·장단점이 함께 표시되고 사용자가 선택한다:
+실행하면 director가 먼저 에이전트별 모델을 묻는다 — **planner / dev / qa** 각각. (**researcher**는 리서치가 필요한 작업에서만 투입되며, 투입이 결정되는 시점에 모델을 묻는다 — `--models researcher=...`로 미리 지정 가능.) "권장" 표기는 없다: 작업에 따라 맞는 모델이 다르므로, 각 옵션에 용도·장단점이 함께 표시되고 사용자가 선택한다:
 
 | 모델 | 적합한 작업 | 트레이드오프 |
 |---|---|---|
@@ -60,7 +62,7 @@
 질문을 건너뛰려면 플래그 사용:
 
 ```
-/agentroom --models planner=opus,dev=sonnet,qa=opus <작업>
+/agentroom --models planner=opus,dev=sonnet,qa=opus,researcher=sonnet <작업>
 ```
 
 ## 역할
@@ -71,6 +73,9 @@
 | `planner` | `agentroom-planner` | 계획서·설계서 작성 | Read/Grep/Glob/Write/Edit |
 | `dev` | `agentroom-developer` | 구현·버그 수정 | + Bash |
 | `qa` | `agentroom-auditor` | 검증·반박·판정 | **읽기 전용** |
+| `researcher` | `agentroom-researcher` | 웹 조사·사례 수집·외부 의존성 검증 (리서치 필요 작업에서만) | Read/Grep/Glob/Write + WebSearch/WebFetch |
+
+**조건부 디자인 스킬** — UI 변경 검수 시 director가 지시에 **"Design review included"**를 명시하면 qa가 `web-design-guidelines` 스킬을 로드해 객관 위반(대비·간격·계층·반응형)까지 검수하고, dev는 시각 산출물 제작 전 `artifact-design`을 로드한다. 둘 다 **해당 스킬이 사용자 환경에 존재할 때만** 로드하며, 없으면 그 사실을 명시하고 기본 기준으로 진행한다. 비 UI 작업에서는 로드하지 않는다.
 
 ## 게이트 모드
 
