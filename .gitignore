@@ -1,2 +1,6 @@
 # AgentRoom runtime records (created when running /agentroom in this folder)
 .agentroom/
+
+# bkit runtime artifacts (created by bkit hooks when a session opens in this folder; not part of AgentRoom)
+docs/.bkit-memory.json
+docs/.pdca-status.json
