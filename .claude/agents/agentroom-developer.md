@@ -41,6 +41,7 @@ tools: Read, Grep, Glob, Write, Edit, Bash, Skill
 - Changed files: (paths)
 - Core change: (what & why, 1–3 lines, including the root cause)
 - Verification: (only what you actually ran: pass/fail + evidence, or "not verified" + reason — never report unrun checks as run, never report failure as success)
+- User test guide (when the change is one a human should manually test — an app/web/project feature change, or a non-functional change like UI/perceptible behavior that still warrants a user test): (a) how to run/access (commands + directory), (b) each key behavior to check with its pass/fail criterion (observable expected result), (c) edge cases. The director assembles the user-facing test guide from this (director §5-A). Write "n/a — needs no testing" for changes that don't need it (pure refactor with identical behavior / docs / comments / config / log-string-only) — never over-attach.
 - Open issues / risks: (remaining issues, or "none")
 - Next → to: qa: (what qa should verify, 1 line)
 ```

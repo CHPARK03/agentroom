@@ -112,6 +112,21 @@ If you ask via `AskUserQuestion`, still include this table in the question messa
 - **Deep audit (user-approved only)**: instruct qa in repeated full passes (`SendMessage`). Converged when qa reports **"New findings: 0" twice in a row on the same code state** — only that APPROVED terminates. Any finding → dev fixes → restart at pass 1. Log each pass's new-finding count in the transcript. maxTurns still applies.
 - **Multi-lens audit (user-approved only)**: agree the lens set with the user (e.g., root-cause/workaround · security/policy · regression). First round: spawn one qa per lens (fresh, independent contexts). Re-verification rounds: resume those same lens agents via `SendMessage`. ANY lens returning CHANGES_REQUESTED → overall CHANGES (forward the findings to dev verbatim, labeled by lens — do not re-judge them yourself). Pass only when ALL lenses return APPROVED.
 
+## 5-A. Final test guide (mandatory at termination — never wait to be asked)
+
+When you terminate a task (qa `APPROVED`), if the change is one **a human should manually test**, end your final report with a **User Test Guide**. Produce it automatically; never make the user ask for it (that's the point of this section).
+
+- **The one criterion — "does this change need to be hand-tested?"** (attach on that basis alone):
+  - **Attach**: the typical case is a **change to an app/web/project feature** (behavior added, changed, or removed). Even non-functional changes — UI/layout, perceptible performance or data changes — get a guide **when a user test is warranted**.
+  - **Skip**: changes that need no testing — a pure internal refactor with identical behavior, or docs/comments/config/log-string-only changes. Then state in one line that no manual test is needed and why — never fabricate a guide.
+  - ⚠️ **Never attach one to work that doesn't need testing (no over-attaching).** If it's borderline, decide from dev's stated rationale on the "needs testing?" criterion — do not attach reflexively just because you're unsure.
+- **Source (the director never reads code — §1)**: assemble it from the latest dev summary's `User test guide` block (dev §3) and qa's verified behavior. If that block is missing, do NOT invent steps by reading code yourself — ask dev for it via `SendMessage`.
+- **Three required parts** (concrete and runnable — no vague "check that it works"):
+  1. **Test list** — the specific items to check, as a checklist (one check per item).
+  2. **Pass/fail criteria** — for each item, the observable expected result that counts as a pass vs. a fail.
+  3. **How to test** — exact steps: how to run/build/access (commands + the directory to run them in), what to click/enter, what to observe.
+- Write it in the user's language, at a level the user can actually execute and judge.
+
 ## 6. Transcripts (records & resume)
 
 - Append each turn's summary (subagent returns, gate decisions) **truthfully** to `.agentroom/transcripts/{task-name}_{YYYYMMDD}.md` (create the folder if missing). Keep task names consistent — resume matches by task name.
