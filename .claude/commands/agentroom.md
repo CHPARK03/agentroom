@@ -70,8 +70,11 @@ Then ask **"Proceed with this configuration?"** — start the §3 workflow only 
 
 1. **Resume check (first)**: look in `.agentroom/transcripts/` for the latest file matching the task name. If found, read it and continue from the recorded state (dev re-reads the listed changed files from disk — files, not memory, are the source of truth). If resume-vs-new is ambiguous, or required resume fields (§6) are missing, STOP and ask the user.
 2. **Decompose & route**: design needed (new feature / structural change / complex logic) → planner first. Simple task (bug fix, small change) → dev directly. **Research needed → researcher first** (its findings feed planner/dev). Deploy researcher (default-off) ONLY when: (a) the user explicitly asks for research in the task, (b) the task is impossible without external information — benchmarking / example collection, verifying an external API or library (existence, free-tier limits, pricing, docs), current policies or trends — or (c) planner/dev raises "external info needed" mid-run and the user approves it at a gate. **"Might be nice to have" is NOT a reason** — when in doubt, start without it (a speculative spawn is the biggest token waste). Never cap the researcher's internal research volume (its context is isolated from yours); the only boundaries are these criteria and its summary-only return.
-3. **Ping-pong** until qa approves or maxTurns is reached (**20**; 1 subagent call = 1 turn). On reaching maxTurns, don't force-stop — ask the user "continue?".
-4. **Spectate**: display each returned summary in this chat (turn-level), then append it to the transcript.
+3. **Ping-pong** until qa approves or maxTurns is reached (**20**; 1 subagent call = 1 turn). **Display the turn count `turn N/20` every turn in the spectate header (§3-4b) — mandatory, never omit (it was often missing before this rule); flag `⚠ N turns left` when ≤5 remain.** On reaching maxTurns, don't force-stop — ask the user "continue?".
+4. **Spectate (mandatory every turn — so the user can follow progress by eye)**: show each subagent call in this chat via the 3 elements below, then append the summary to the transcript. Mid-execution streaming is impossible (the `Agent` tool returns only a final result) — so always leave a turn-level trail of "what's starting" (before) and "what was done" (after).
+   - **(a) Pre-call banner** — right BEFORE calling a subagent, one line: `▶ Calling {role} ({subagent_type} · model={chosen}) — task: {one-line}`. Makes it immediately visible who is starting, on what model, doing what.
+   - **(b) Turn status header** — when displaying a subagent's result, a compact top line: `[turn N/20 · mode {conservative|balanced|aggressive} · checklist X/Y] just now {role}→{verdict}→to: {next}`. **Always include `turn N/20`** (never omit — §3-3). Write `single` in place of the checklist for single-item tasks.
+   - **(c) Result summary (fixed 4 fields)** — under the header, render each return in the same shape: `role / what it did (1–2 lines) / verdict / next to:`. Pull "what it did" from the return's core (dev = core change, planner = key decisions, qa = findings, researcher = key findings). Never pull full code/docs into this context (§1).
 
 ## 4. Gates (default mode: conservative)
 
@@ -126,6 +129,20 @@ When you terminate a task (qa `APPROVED`), if the change is one **a human should
   2. **Pass/fail criteria** — for each item, the observable expected result that counts as a pass vs. a fail.
   3. **How to test** — exact steps: how to run/build/access (commands + the directory to run them in), what to click/enter, what to observe.
 - Write it in the user's language, at a level the user can actually execute and judge.
+
+## 5-B. Session handoff message (on user request — auto-composed)
+
+When the user asks to **hand off / carry the task over to another session** ("continue this elsewhere", "move to a new session"), the director auto-composes a ready-to-paste resume message for the new session — so the user never has to assemble the command by hand. (Composing the message is output, not execution, so it needs no gate; but you cannot auto-start the new session — pasting is the user's step.)
+
+1. **Confirm the latest transcript is appended** — ensure `.agentroom/transcripts/{task-name}_{YYYYMMDD}.md` has the required resume fields (§6) filled through the last turn; update it first if not (resume quality depends entirely on this record).
+2. **Emit the paste-ready message** in a code block (easy to copy):
+   ```
+   /agentroom {task-name} --mode {current mode} --models planner={m},dev={m},qa={m}
+   ↑ Continuation of "{task-name}". Resume from the latest state in transcripts/{filename}.
+     (last: {stage} · {last role} {last verdict} · next to: {next})
+   ```
+   - **Reproduce the task name and flags (`--mode`, `--models`) exactly as this run** — the new session's resume check (§3-1) matches the latest transcript **by task name**; if they diverge, resume matching and the run config break. Use the §0 model selections verbatim, and include `researcher={m}` if researcher was used.
+3. State details (open issues, changed files) already live in the transcript — do NOT duplicate them here. The message is just: command + resume hint + one-line last state.
 
 ## 6. Transcripts (records & resume)
 
