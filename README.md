@@ -24,6 +24,7 @@ One session becomes the **director** and ping-pongs **planner → dev → qa** s
 - **False-report defense** — dev can never declare itself "done". A read-only **qa** agent re-reads the actual files and challenges the claims; only its `APPROVED` can end the run.
 - **Resumable** — every turn is appended to `.agentroom/transcripts/`; a brand-new session picks up exactly where the last one stopped (including an item-level task checklist).
 - **Role isolation enforced by tools** — qa physically has no Write/Edit access; the director is forbidden to touch deliverable files at all.
+- **Cost-aware dev routing** — routine dev subtasks run on the lighter default (sonnet / high effort); the director auto-promotes hard subtasks (concurrency, security, recurring bugs) to the heavy variant (opus / xhigh). Every promotion is visible in the spectate banner.
 - **Spot-strength audits** — optional **deep audit** (repeat until "0 new findings" twice in a row) before releases, and **multi-lens audit** (independent security / regression / root-cause reviewers) for high-risk changes. Both fire **only with your approval**.
 
 ## Quick start
@@ -36,6 +37,7 @@ One session becomes the **director** and ping-pongs **planner → dev → qa** s
        └── agents/
            ├── agentroom-planner.md
            ├── agentroom-developer.md
+           ├── agentroom-developer-hard.md
            ├── agentroom-auditor.md
            └── agentroom-researcher.md
    ```
@@ -45,24 +47,35 @@ One session becomes the **director** and ping-pongs **planner → dev → qa** s
    /agentroom <your task>
    ```
 
-## Model selection (asked at start)
+## Models & efforts (defaults pinned, asked at start)
 
-On every run, the director first asks which model each agent should use — **planner / dev / qa**. (**researcher** joins only research-needed tasks; its model is asked if and when it joins, or set via `--models researcher=...`.) No option is marked "recommended": the right choice depends on your task, so each option is shown with its use cases and trade-offs:
+Each agent ships with a **default model + reasoning effort pinned in its frontmatter**:
+
+| Role | Default model | Effort |
+|---|---|---|
+| planner | opus | xhigh |
+| dev (base) | sonnet | high |
+| dev (promoted) | opus | xhigh |
+| qa | opus | xhigh |
+| researcher | sonnet | medium |
+
+On every run the director still asks which model to use — **planner / dev (base) / dev (promoted) / qa**, with each role's default tagged `(default)`; keep it or override it per task. (**researcher** joins only research-needed tasks; its model is asked if and when it joins, or set via `--models researcher=...`.) Each option is shown with its use cases and trade-offs:
 
 | Model | Best for | Trade-off |
 |---|---|---|
-| inherit (default) | light tasks, or sessions already on a strong model | quality tracks your session model |
 | opus | complex design, large refactors, building from a spec, high-stakes review | heaviest token usage, slower |
 | sonnet | routine bug fixes, small features, straightforward work | may miss subtleties in complex work |
 | haiku | trivial mechanical edits, formatting | notable quality drop for planning/audit — avoid for qa on important work |
 
+**dev has two variants**: base (`agentroom-developer`, sonnet/high) for everyday subtasks, and promoted (`agentroom-developer-hard`, opus/xhigh — same rules, loaded from the base file as a single source) which the director spawns automatically when a subtask trips a hard trigger: concurrency/transactions, security (DB rules, auth, payments, secrets), or recurring/unclear-cause bugs. When in doubt, it promotes. Effort is not selectable at runtime (the `Agent` tool has no effort parameter) — edit the agent files to change it.
+
 > ⚠️ **AgentRoom was designed and tuned on Opus with `xhigh` reasoning effort.**
-> With weaker models, planning and audit quality can degrade significantly. The default (`inherit`) follows whatever model your session uses — safe for any plan, but quality tracks your session model.
+> With weaker models, planning and audit quality can degrade significantly.
 
 Skip the questions with a flag:
 
 ```
-/agentroom --models planner=opus,dev=sonnet,qa=opus,researcher=sonnet <task>
+/agentroom --models planner=opus,dev=sonnet,dev-hard=opus,qa=opus <task>
 ```
 
 ## Roles
@@ -71,11 +84,12 @@ Skip the questions with a flag:
 |---|---|---|---|
 | `director` | (your session) | routing · gates · termination — never designs/implements/reviews | read-only + transcripts |
 | `planner` | `agentroom-planner` | plan & design documents | Read/Grep/Glob/Write/Edit |
-| `dev` | `agentroom-developer` | implementation · bug fixes | + Bash |
+| `dev` (base) | `agentroom-developer` | implementation · bug fixes (base difficulty) | + Bash |
+| `dev` (promoted) | `agentroom-developer-hard` | hard subtasks — concurrency · security · recurring bugs (auto-promoted by the director) | + Bash |
 | `qa` | `agentroom-auditor` | verification · challenge · verdicts | **read-only** |
 | `researcher` | `agentroom-researcher` | web research · examples · external-dependency verification (research-needed tasks only) | Read/Grep/Glob/Write + WebSearch/WebFetch |
 
-**Conditional design skills** — for UI changes the director marks the review instruction with **"Design review included"**: qa then loads the `web-design-guidelines` skill (objective checks only: contrast, spacing, hierarchy, responsiveness), and dev loads `artifact-design` before building visual deliverables. Both load **only if those skills exist in your environment**; otherwise the agents note it and proceed with baseline criteria. Non-UI runs never load them.
+**Conditional design skills** — for UI changes the director marks the review instruction with **"Design review included"**: qa then loads the `web-design-guidelines` skill (objective checks only: contrast, spacing, hierarchy, responsiveness), and dev loads `artifact-design` before building visual deliverables. When the delegated work is **new UI or a redesign**, the director additionally instructs dev to load `frontend-design` (distinctive palette/typography/layout direction; if your project mandates a design system, that constraint is passed in the same instruction so the skill works within it). All of these load **only if those skills exist in your environment**; otherwise the agents note it and proceed with baseline criteria. Non-UI runs never load them.
 
 ## Gate modes
 
@@ -86,6 +100,8 @@ Push / deletion / release gates apply in **all** modes. `--mode` controls the mi
 | `conservative` (default) | every direction decision + deadlock + repeated failure | semi-attended, ~zero drift |
 | `balanced` | deadlock + repeated failure | big forks only |
 | `aggressive` | severe deadlock only | nearly unattended, review at the end |
+
+One more always-on gate: when dev flags that a conclusion depends on **runtime data state** (DB contents, deployed/seeded data), the director stops and asks you to verify it live — no agent may assert it from code (code review can't catch runtime data).
 
 ## Optional audits (your approval required — never auto-fired)
 
@@ -106,17 +122,12 @@ All knobs live in frontmatter / the command file — edit once, applies everywhe
 
 | What | Where | How |
 |---|---|---|
-| Pin a model per agent | `.claude/agents/agentroom-*.md` | add `model: opus` (author's setup) |
-| Pin reasoning effort | same | add `effort: xhigh` (author's setup) |
-| Preload your coding standards | same | add `skills:` list with your project skills |
+| Change an agent's default model | `.claude/agents/agentroom-*.md` | edit the `model:` field |
+| Change reasoning effort | same | edit the `effort:` field |
+| Preload your coding standards | same | add a `skills:` list with your project skills |
 | maxTurns / gate defaults | `.claude/commands/agentroom.md` | edit §3–§4 |
 
-To replicate the author's original configuration exactly, add to each agent's frontmatter:
-
-```yaml
-model: opus
-effort: xhigh
-```
+The agents ship with the author's defaults already pinned (planner opus/xhigh · dev sonnet/high · dev-hard opus/xhigh · qa opus/xhigh · researcher sonnet/medium). Edit the frontmatter to change them; keep the base/hard file split if you want per-difficulty efforts — effort cannot be changed at runtime.
 
 ## Safety
 

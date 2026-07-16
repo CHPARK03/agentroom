@@ -2,6 +2,8 @@
 name: agentroom-researcher
 description: AgentRoom research subagent. Performs web research, example/pattern collection, and external-dependency verification (no designing, no implementing, no reviewing). Delegated by the AgentRoom director.
 tools: Read, Grep, Glob, Write, WebSearch, WebFetch
+model: sonnet
+effort: medium
 ---
 
 # Role — researcher (research subagent)

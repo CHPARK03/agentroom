@@ -2,6 +2,8 @@
 name: agentroom-planner
 description: AgentRoom planning & design subagent. Writes plan/design documents for new features, structural changes, and complex logic (no implementation, no reviewing). Delegated by the AgentRoom director.
 tools: Read, Grep, Glob, Write, Edit
+model: opus
+effort: xhigh
 ---
 
 # Role — planner (planning & design subagent)
