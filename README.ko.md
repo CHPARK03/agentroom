@@ -24,7 +24,7 @@
 - **거짓보고 방어** — dev는 스스로 "완료"를 선언할 수 없다. 읽기 전용 **qa**가 실제 파일을 직접 읽어 주장을 검증·반박하고, qa의 `APPROVED`만이 작업을 종료시킨다.
 - **세션 간 재개** — 매 턴이 `.agentroom/transcripts/`에 기록되어, 새 세션이 마지막 상태(항목별 체크리스트 포함)부터 정확히 이어간다.
 - **도구 권한으로 강제되는 역할 격리** — qa는 Write/Edit 권한 자체가 없고, director는 산출물 파일을 만지는 것이 금지된다.
-- **비용 인지형 dev 라우팅** — 일상적 dev 하위작업은 가벼운 기본값(sonnet / high effort)으로 돌고, 고난도 하위작업(동시성·보안·재발 버그)은 director가 자동으로 상위 변형(opus / xhigh)으로 승격한다. 승격은 관전 배너에서 매번 확인 가능.
+- **비용 인지형 dev 라우팅** — 일상적 dev 하위작업은 가벼운 기본값(sonnet)으로 돌고, 고난도 하위작업(동시성·보안·재발 버그)은 director가 자동으로 상위 변형(opus)으로 승격한다. 승격은 관전 배너에서 매번 확인 가능.
 - **스팟 강화 검수(옵션)** — 출시 전 **심층검수**(새 발견 0건 2회 연속까지 반복), 고위험 변경 시 **다관점 검수**(보안·회귀·근본원인 렌즈별 독립 검수). 둘 다 **사용자 승인 시에만** 발동.
 
 ## 빠른 시작
@@ -53,10 +53,10 @@
 
 | 역할 | 기본 모델 | effort |
 |---|---|---|
-| planner | opus | xhigh |
+| planner | opus | high |
 | dev(기본) | sonnet | high |
-| dev(승격) | opus | xhigh |
-| qa | opus | xhigh |
+| dev(승격) | opus | high |
+| qa | opus | high |
 | researcher | sonnet | medium |
 
 실행하면 director가 여전히 에이전트별 모델을 묻는다 — **planner / dev(기본) / dev(승격) / qa** 각각, 그 역할의 기본 모델 옵션에 `(기본)` 표기가 붙는다. 그대로 가거나 이번 작업에 맞게 바꾸면 된다. (**researcher**는 리서치가 필요한 작업에서만 투입되며, 투입이 결정되는 시점에 모델을 묻는다 — `--models researcher=...`로 미리 지정 가능.) 각 옵션에 용도·장단점이 함께 표시된다:
@@ -67,9 +67,11 @@
 | sonnet | 일상적 버그 수정, 소규모 기능, 단순 구현 | 복잡한 구조·심층 검수에서 미묘한 문제를 놓칠 수 있음 |
 | haiku | 사소한 기계적 수정, 포매팅 | 설계·검수 품질 크게 하락 — 중요 작업의 qa로는 비권장 |
 
-**dev는 2변형이다**: 기본(`agentroom-developer`, sonnet/high)이 일상 하위작업을 맡고, 승격(`agentroom-developer-hard`, opus/xhigh — 규칙은 기본 파일을 단일 소스로 로드, 100% 동일)은 하위작업이 고난도 트리거에 걸리면 director가 자동 spawn한다: 동시성·트랜잭션 / 보안(DB rules·인증·결제·시크릿) / 재발·원인불명 버그. 애매하면 승격한다. effort는 실행 중 선택 불가(`Agent` 툴에 파라미터 없음) — 바꾸려면 에이전트 파일을 수정한다.
+**dev는 2변형이다**: 기본(`agentroom-developer`, sonnet/high)이 일상 하위작업을 맡고, 승격(`agentroom-developer-hard`, opus/high — 규칙은 기본 파일을 단일 소스로 로드, 100% 동일)은 하위작업이 고난도 트리거에 걸리면 director가 자동 spawn한다: 동시성·트랜잭션 / 보안(DB rules·인증·결제·시크릿) / 재발·원인불명 버그. 애매하면 승격한다.
 
-> ⚠️ **AgentRoom은 Opus + `xhigh` reasoning effort 기준으로 설계·튜닝되었다.**
+**effort — 기본은 `high`, 상향 옵션이 `xhigh`다.** 실사용상 일상 작업에는 `high`로 충분해 전 역할이 `high`(researcher만 `medium`)로 출고되고, dev 2변형의 차이는 effort가 아니라 **모델**이다. 비용보다 정밀도가 중요한 작업 — 고위험 설계, 보안·결제 검수, 출시 직전 감사 — 에는 **`xhigh`를 추천한다**: 해당 에이전트 파일(보통 planner·qa, 고난도 구현이면 `agentroom-developer-hard`)의 `effort:`를 `xhigh`로 바꾸고 세션을 재시작하면 된다. effort는 실행 중 선택 불가(`Agent` 툴에 파라미터 없음)이며, `agentroom-developer-hard`를 별도 파일로 두는 이유가 바로 이것이다 — 난이도별 effort 차등을 언제든 되살릴 수 있는 이음매다.
+
+> ⚠️ **AgentRoom은 Opus 기준으로 설계·튜닝되었다.**
 > 그 이하 모델에서는 설계·검수 품질이 크게 떨어질 수 있다.
 
 질문을 건너뛰려면 플래그 사용:
@@ -103,6 +105,12 @@ push·삭제·출시 게이트는 **모든 모드 공통**. `--mode`는 중간 �
 
 추가 상시 게이트 하나: dev가 결론이 **런타임 데이터 상태**(DB 내용·배포/시드 반영 여부)에 의존한다고 올리면, director는 멈추고 사용자에게 라이브 확인(콘솔·쿼리)을 요청한다 — 어떤 에이전트도 코드만으로 데이터 상태를 단정할 수 없다(코드 검수로는 런타임 데이터를 못 잡는다).
 
+### 비상 정지 — `!stop`
+
+**`!stop`** 을 입력하면 director는 즉시 멈춘다: 새 호출을 하지 않고, 실행 중인 서브에이전트를 `TaskStop`으로 전부 종료하고(director가 멈춰도 서브에이전트는 계속 돌며 토큰을 쓴다), 중단 지점을 transcript에 기록한 뒤 턴을 끝낸다 — "정말 종료할까요?" 되묻지 않고, 추가 질문도 하지 않는다. 다음 지시를 주면 턴 카운트·게이트 상태를 그대로 유지한 채 그 지점부터 이어간다.
+
+트리거는 이 토큰 하나뿐이다. 문장 속의 맨 "stop"·"중지"로는 발동하지 않는다 — 앞의 `!` 가 있어야 한다.
+
 ## 옵션 검수 (사용자 승인 필수 — 자동 발동 없음)
 
 | 검수 | 제안 시점 | 동작 |
@@ -114,6 +122,7 @@ push·삭제·출시 게이트는 **모든 모드 공통**. `--mode`는 중간 �
 
 - 매 턴이 `.agentroom/transcripts/{작업명}_{YYYYMMDD}.md`에 append된다.
 - 각 기록에 재개 필드 포함: 작업명, 현재 단계, 마지막 역할, 마지막 판정, 다음 `to:`, 미해결 리스크, 변경 파일, **작업 항목 체크리스트**(항목별 done/pending — 진행 상태의 단일 기준).
+- **지시는 결과가 나온 뒤가 아니라 호출 직전에 먼저 기록한다** — 중단(`!stop`·API 한도·오류)돼도 미완성 지시가 남아 그대로 재개된다. 재개 비용의 대부분은 "무엇을 시키려 했는지"를 다시 만드는 일이다.
 - 같은 작업명으로 새 세션에서 실행하면 최신 transcript를 읽어 마지막 상태부터 이어간다.
 
 ## 커스터마이즈
@@ -121,11 +130,11 @@ push·삭제·출시 게이트는 **모든 모드 공통**. `--mode`는 중간 �
 | 항목 | 위치 | 방법 |
 |---|---|---|
 | 에이전트별 기본 모델 변경 | `.claude/agents/agentroom-*.md` | `model:` 필드 수정 |
-| reasoning effort 변경 | 동일 | `effort:` 필드 수정 |
+| reasoning effort 변경 | 동일 | `effort:` 필드 수정 — 출고값은 `high`, **정밀도가 필요하면 `xhigh` 추천** |
 | 자기 코딩 표준 스킬 계승 | 동일 | `skills:` 목록에 프로젝트 스킬 추가 |
 | maxTurns·게이트 기본값 | `.claude/commands/agentroom.md` | §3–§4 수정 |
 
-에이전트에는 제작자 기본값이 이미 박혀 있다(planner opus/xhigh · dev sonnet/high · dev-hard opus/xhigh · qa opus/xhigh · researcher sonnet/medium). 바꾸려면 frontmatter를 수정하면 되고, 난이도별 effort 차등을 유지하려면 기본/하드 파일 분리를 유지한다 — effort는 실행 중 변경 불가.
+에이전트에는 제작자 기본값이 이미 박혀 있다(planner opus/high · dev sonnet/high · dev-hard opus/high · qa opus/high · researcher sonnet/medium). 바꾸려면 frontmatter를 수정하면 된다. 난이도별 effort 차등을 쓰려면 기본/하드 파일 분리를 유지한다 — 기본 작업은 `high`로 두고 고난도만 `xhigh`로 올리는 유일한 방법이다(effort는 실행 중 변경 불가).
 
 ## 안전
 

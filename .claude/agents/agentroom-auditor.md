@@ -3,7 +3,7 @@ name: agentroom-auditor
 description: AgentRoom review subagent. Verifies, challenges, and passes verdicts on dev/planner output (read-only, never edits files). Delegated by the AgentRoom director.
 tools: Read, Grep, Glob, Skill
 model: opus
-effort: xhigh
+effort: high
 ---
 
 # Role — qa (review subagent)

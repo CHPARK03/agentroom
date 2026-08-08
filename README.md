@@ -24,7 +24,7 @@ One session becomes the **director** and ping-pongs **planner → dev → qa** s
 - **False-report defense** — dev can never declare itself "done". A read-only **qa** agent re-reads the actual files and challenges the claims; only its `APPROVED` can end the run.
 - **Resumable** — every turn is appended to `.agentroom/transcripts/`; a brand-new session picks up exactly where the last one stopped (including an item-level task checklist).
 - **Role isolation enforced by tools** — qa physically has no Write/Edit access; the director is forbidden to touch deliverable files at all.
-- **Cost-aware dev routing** — routine dev subtasks run on the lighter default (sonnet / high effort); the director auto-promotes hard subtasks (concurrency, security, recurring bugs) to the heavy variant (opus / xhigh). Every promotion is visible in the spectate banner.
+- **Cost-aware dev routing** — routine dev subtasks run on the lighter default (sonnet); the director auto-promotes hard subtasks (concurrency, security, recurring bugs) to the heavy variant (opus). Every promotion is visible in the spectate banner.
 - **Spot-strength audits** — optional **deep audit** (repeat until "0 new findings" twice in a row) before releases, and **multi-lens audit** (independent security / regression / root-cause reviewers) for high-risk changes. Both fire **only with your approval**.
 
 ## Quick start
@@ -53,10 +53,10 @@ Each agent ships with a **default model + reasoning effort pinned in its frontma
 
 | Role | Default model | Effort |
 |---|---|---|
-| planner | opus | xhigh |
+| planner | opus | high |
 | dev (base) | sonnet | high |
-| dev (promoted) | opus | xhigh |
-| qa | opus | xhigh |
+| dev (promoted) | opus | high |
+| qa | opus | high |
 | researcher | sonnet | medium |
 
 On every run the director still asks which model to use — **planner / dev (base) / dev (promoted) / qa**, with each role's default tagged `(default)`; keep it or override it per task. (**researcher** joins only research-needed tasks; its model is asked if and when it joins, or set via `--models researcher=...`.) Each option is shown with its use cases and trade-offs:
@@ -67,9 +67,11 @@ On every run the director still asks which model to use — **planner / dev (bas
 | sonnet | routine bug fixes, small features, straightforward work | may miss subtleties in complex work |
 | haiku | trivial mechanical edits, formatting | notable quality drop for planning/audit — avoid for qa on important work |
 
-**dev has two variants**: base (`agentroom-developer`, sonnet/high) for everyday subtasks, and promoted (`agentroom-developer-hard`, opus/xhigh — same rules, loaded from the base file as a single source) which the director spawns automatically when a subtask trips a hard trigger: concurrency/transactions, security (DB rules, auth, payments, secrets), or recurring/unclear-cause bugs. When in doubt, it promotes. Effort is not selectable at runtime (the `Agent` tool has no effort parameter) — edit the agent files to change it.
+**dev has two variants**: base (`agentroom-developer`, sonnet/high) for everyday subtasks, and promoted (`agentroom-developer-hard`, opus/high — same rules, loaded from the base file as a single source) which the director spawns automatically when a subtask trips a hard trigger: concurrency/transactions, security (DB rules, auth, payments, secrets), or recurring/unclear-cause bugs. When in doubt, it promotes.
 
-> ⚠️ **AgentRoom was designed and tuned on Opus with `xhigh` reasoning effort.**
+**On effort — `high` is the default; `xhigh` is the upgrade.** In practice `high` is enough for ordinary work, so every role ships at `high` (researcher at `medium`) and the two dev variants differ by **model**, not effort. When precision matters more than cost — high-stakes design, security/payment review, a release-gating audit — **`xhigh` is recommended**: set `effort: xhigh` in the relevant agent file (usually planner and/or qa, or `agentroom-developer-hard` for hard implementation) and restart the session. Effort is not selectable at runtime — the `Agent` tool has no effort parameter, which is exactly why `agentroom-developer-hard` is a separate file: it is the seam where a per-difficulty effort tier can be re-introduced at any time.
+
+> ⚠️ **AgentRoom is designed and tuned on Opus.**
 > With weaker models, planning and audit quality can degrade significantly.
 
 Skip the questions with a flag:
@@ -103,6 +105,12 @@ Push / deletion / release gates apply in **all** modes. `--mode` controls the mi
 
 One more always-on gate: when dev flags that a conclusion depends on **runtime data state** (DB contents, deployed/seeded data), the director stops and asks you to verify it live — no agent may assert it from code (code review can't catch runtime data).
 
+### Emergency brake — `!stop`
+
+Type **`!stop`** and the director halts at once: it spawns nothing new, kills every running subagent with `TaskStop` (a subagent left running keeps burning tokens after the director stops), writes the stop point into the transcript, and ends the turn — no "are you sure?", no follow-up questions. Your next instruction resumes from that point with the turn count and gate state intact.
+
+The trigger is that exact token. The bare word "stop" in a sentence does nothing — you need the leading `!`.
+
 ## Optional audits (your approval required — never auto-fired)
 
 | Audit | When suggested | What it does |
@@ -114,6 +122,7 @@ One more always-on gate: when dev flags that a conclusion depends on **runtime d
 
 - Every turn is appended to `.agentroom/transcripts/{task-name}_{YYYYMMDD}.md`.
 - Each record carries resume fields: task name, current stage, last role, last verdict, next `to:`, open risks, changed files, and a **task checklist** (done/pending per item — the single source of progress truth).
+- **The instruction is written down before the call, not after the result** — so an interrupted run (`!stop`, API limit, error) still resumes from the instruction it never got to finish. Rebuilding "what was I about to ask for" is most of the cost of resuming.
 - A new session with the same task name reads the latest transcript and continues from the recorded state.
 
 ## Customization
@@ -123,11 +132,11 @@ All knobs live in frontmatter / the command file — edit once, applies everywhe
 | What | Where | How |
 |---|---|---|
 | Change an agent's default model | `.claude/agents/agentroom-*.md` | edit the `model:` field |
-| Change reasoning effort | same | edit the `effort:` field |
+| Change reasoning effort | same | edit the `effort:` field — ships at `high`; **`xhigh` recommended for higher-precision work** |
 | Preload your coding standards | same | add a `skills:` list with your project skills |
 | maxTurns / gate defaults | `.claude/commands/agentroom.md` | edit §3–§4 |
 
-The agents ship with the author's defaults already pinned (planner opus/xhigh · dev sonnet/high · dev-hard opus/xhigh · qa opus/xhigh · researcher sonnet/medium). Edit the frontmatter to change them; keep the base/hard file split if you want per-difficulty efforts — effort cannot be changed at runtime.
+The agents ship with the author's defaults already pinned (planner opus/high · dev sonnet/high · dev-hard opus/high · qa opus/high · researcher sonnet/medium). Edit the frontmatter to change them. Keep the base/hard file split if you want per-difficulty efforts — that split is the only way to give hard subtasks `xhigh` while base work stays at `high`, since effort cannot be changed at runtime.
 
 ## Safety
 
