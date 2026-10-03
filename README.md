@@ -1,5 +1,7 @@
 # AgentRoom
 
+> **Archived (2026-10).** AgentRoom is no longer maintained. As models got stronger, splitting work across many fine-grained roles cost more than it gained, so its principles — read-only review that never trusts a "done" claim, and a human gate for anything hard to undo — were merged into a smaller personal work engine (one builder + one evaluator). The code below stays as it was at v1.1.0 under the MIT license.
+
 **Human-gated multi-agent orchestration for Claude Code.**
 One session becomes the **director** and ping-pongs **planner → dev → qa** subagents through design → implementation → review, while you only watch and approve the gates.
 
